@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+
+    <title>House Price Predictor</title>
+
+    <!-- ... -->
+    <!--    <script src="../static/script.js">-->
+    <!--    </script>-->
+    <!-- ... -->
+
+</head>
+<body class="bg-dark">
+<div class="container">
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header text-center">
+                    <h1>Welcome to House Price Predictor</h1>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="/predict">
+
+                        <div class="form-group">
+                            <label for="rooms"><b>Select the number of rooms:</b></label>
+                            <select class="form-control" id="rooms" name="rooms" required>
+                                <!-- Add your options here -->
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <!-- ... -->
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="landsize"><b>Enter Landsize:</b></label>
+                            <input type="text" class="form-control" id="landsize" name="landsize"
+                                   placeholder="Enter Landsize" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="bathroom"><b>Enter Number of Bathrooms:</b></label>
+                            <input type="text" class="form-control" id="bathroom" name="bathroom"
+                                   placeholder="Enter Number of Bathrooms" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="distance"><b>Enter Distance:</b></label>
+                            <input type="text" class="form-control" id="distance" name="distance"
+                                   placeholder="Enter Distance" required>
+                        </div>
+
+                        <div class="form-group text-center">
+                            <button type="submit" class="btn btn-primary">Predict Price</button>
+                        </div>
+
+                    </form>
+
+                    <div class="text-center">
+                        <h3><span id="prediction"></span></h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Optional JavaScript -->
+<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+<!-- ... -->
+<script>
+  // Function to handle form submission
+  function submitForm(event) {
+  console.log("HELLO")
+    event.preventDefault(); // Prevent the form from submitting normally
+
+    // Get the form data
+    var formData = new FormData(event.target);
+    console.log(formData)
+    // Send a POST request to the '/predict' route
+    fetch('/predict', {
+      method: 'POST',
+      body: formData
+    })
+      .then(response => response.json())
+      // Parse the response as JSON
+      .then(data => {
+        // Update the 'prediction' element with the predicted price
+        var predictionElement = document.getElementById('prediction');
+      predictionElement.textContent = 'Predicted Price: ' + data.predicted_price;
+      })
+      .catch(error => {
+        console.error('Error:', error);
+      });
+  }
+
+  // Add an event listener to the form to handle the submission
+document.addEventListener('DOMContentLoaded', function() {
+  var form = document.querySelector('form');
+  form.addEventListener('submit', submitForm);
+});
+
+
+</script>
+<!-- ... -->
+
+</body>
+</html>
