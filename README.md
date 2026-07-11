@@ -104,7 +104,10 @@ python -m src.explain                     # regenerate report figures
 streamlit run app.py                      # launch the demo
 ```
 
-The app only needs `requirements.txt`; a trained `models/avm_pipeline.joblib` is included so it runs out of the box.
+The app only needs `requirements.txt`. On startup it **rebuilds the model from the saved
+hyperparameters** (`models/best_params.json`) + the committed data — so the deployed demo is
+immune to scikit-learn / Python version drift (no cross-version pickle to break). First load ≈ a
+few seconds, then cached.
 
 ## Project structure
 
@@ -114,7 +117,7 @@ The app only needs `requirements.txt`; a trained `models/avm_pipeline.joblib` is
 │   ├── data.py                 # cleaning + feature engineering (+ inference helpers)
 │   ├── train.py                # model zoo → Optuna → conformal intervals → artifact
 │   └── explain.py              # SHAP + performance figures
-├── models/avm_pipeline.joblib  # trained pipeline (raw → $ + intervals)
+├── models/best_params.json     # tuned hyperparameters (app rebuilds the model from these)
 ├── reports/                    # metrics, comparison, figures, slide deck
 ├── data/melbourne_housing.csv  # dataset
 └── requirements*.txt

@@ -16,3 +16,4 @@ venv/
 *.log
 optuna_study.db
 catboost_info/
+*.joblib

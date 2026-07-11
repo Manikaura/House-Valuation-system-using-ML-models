@@ -160,14 +160,77 @@ def tune_lightgbm(X_tr, y_tr, n_trials: int = 40):
     return study.best_params, study.best_value
 
 
+# Best hyperparameters from the last Optuna run. The app rebuilds from these so
+# it never has to unpickle a model across scikit-learn/Python versions.
+DEFAULT_PARAMS = {
+    "n_estimators": 1489, "learning_rate": 0.022781267283140554, "num_leaves": 38,
+    "max_depth": 8, "min_child_samples": 5, "subsample": 0.6817377407847849,
+    "colsample_bytree": 0.6272842560912808, "reg_lambda": 2.900609395296397,
+}
+
+
+def split_data():
+    X, y = build_frame()
+    X_tr, X_te, y_tr, y_te = train_test_split(
+        X, y, test_size=0.2, random_state=RANDOM_STATE)
+    return X, X_tr, X_te, y_tr, y_te
+
+
+def fit_final(X_tr, y_tr, best_params):
+    """Fit the tuned LightGBM pipeline and calibrate split-conformal intervals."""
+    import lightgbm as lgb
+    X_fit, X_cal, y_fit, y_cal = train_test_split(
+        X_tr, y_tr, test_size=0.15, random_state=RANDOM_STATE)
+    model = wrap(lgb.LGBMRegressor(
+        n_jobs=-1, random_state=RANDOM_STATE, verbose=-1, **best_params))
+    model.fit(X_fit, y_fit)
+    # nonconformity = absolute residual in log space (matches the modelling target)
+    log_res = np.abs(np.log1p(y_cal.values) - np.log1p(model.predict(X_cal)))
+    conformal_q = {
+        "0.80": float(np.quantile(log_res, 0.80)),
+        "0.90": float(np.quantile(log_res, 0.90)),
+    }
+    return model, conformal_q
+
+
+def evaluate(model, X_te, y_te, conformal_q):
+    test_metrics = metrics(y_te.values, model.predict(X_te))
+    log_pred = np.log1p(model.predict(X_te))
+    lo = np.expm1(log_pred - conformal_q["0.90"])
+    hi = np.expm1(log_pred + conformal_q["0.90"])
+    coverage = float(((y_te.values >= lo) & (y_te.values <= hi)).mean())
+    return test_metrics, coverage
+
+
+def build_artifact(best_params=None):
+    """Rebuild the full serving artifact from scratch — version-proof for the app.
+
+    The Streamlit app calls this at startup instead of unpickling, so the model is
+    always constructed with whatever scikit-learn / LightGBM the runtime installed.
+    This removes the cross-version pickle errors that break cloud deployments.
+    """
+    best_params = best_params or DEFAULT_PARAMS
+    X, X_tr, X_te, y_tr, y_te = split_data()
+    model, conformal_q = fit_final(X_tr, y_tr, best_params)
+    test_metrics, coverage = evaluate(model, X_te, y_te, conformal_q)
+    return {
+        "model": model,
+        "conformal_q": conformal_q,
+        "test_metrics": test_metrics,
+        "pi_coverage_90": coverage,
+        "best_params": best_params,
+        "feature_names_out": list(
+            model.regressor_.named_steps["prep"].get_feature_names_out()),
+        "columns": list(X.columns),
+    }
+
+
 def main(n_trials: int = 40):
     os.makedirs(REPORTS, exist_ok=True)
     os.makedirs(os.path.join(REPORTS, "figures"), exist_ok=True)
     os.makedirs(MODELS, exist_ok=True)
 
-    X, y = build_frame()
-    X_tr, X_te, y_tr, y_te = train_test_split(
-        X, y, test_size=0.2, random_state=RANDOM_STATE)
+    X, X_tr, X_te, y_tr, y_te = split_data()
 
     print("1) Model-zoo cross-validation")
     comparison = compare_zoo(X_tr, y_tr)
@@ -179,49 +242,18 @@ def main(n_trials: int = 40):
     print("  best CV MAE: {:,.0f}".format(best_cv_mae))
     print("  best params:", best_params)
 
-    print("\n3) Fit tuned model + calibrate conformal intervals")
-    import lightgbm as lgb
-    # split train into fit/calibration for split-conformal intervals
-    X_fit, X_cal, y_fit, y_cal = train_test_split(
-        X_tr, y_tr, test_size=0.15, random_state=RANDOM_STATE)
-    model = wrap(lgb.LGBMRegressor(
-        n_jobs=-1, random_state=RANDOM_STATE, verbose=-1, **best_params))
-    model.fit(X_fit, y_fit)
-
-    # nonconformity = absolute residual in log space (matches the modelling target)
-    log_res = np.abs(np.log1p(y_cal.values) - np.log1p(model.predict(X_cal)))
-    conformal_q = {
-        "0.80": float(np.quantile(log_res, 0.80)),
-        "0.90": float(np.quantile(log_res, 0.90)),
-    }
-
-    print("\n4) Held-out test evaluation")
-    test_metrics = metrics(y_te.values, model.predict(X_te))
+    print("\n3) Fit tuned model, calibrate intervals, evaluate")
+    artifact = build_artifact(best_params)
+    test_metrics, coverage = artifact["test_metrics"], artifact["pi_coverage_90"]
     for k, v in test_metrics.items():
         print(f"  {k}: {v:,.3f}")
-    pd.DataFrame([test_metrics]).to_csv(
-        os.path.join(REPORTS, "metrics.csv"), index=False)
-
-    # 90% interval coverage sanity-check on the test set
-    log_pred = np.log1p(model.predict(X_te))
-    lo = np.expm1(log_pred - conformal_q["0.90"])
-    hi = np.expm1(log_pred + conformal_q["0.90"])
-    coverage = float(((y_te.values >= lo) & (y_te.values <= hi)).mean())
     print(f"  Empirical 90% PI coverage: {coverage:.1%}")
+    pd.DataFrame([test_metrics]).to_csv(os.path.join(REPORTS, "metrics.csv"), index=False)
 
-    print("\n5) Persist artifact")
-    artifact = {
-        "model": model,
-        "conformal_q": conformal_q,
-        "test_metrics": test_metrics,
-        "pi_coverage_90": coverage,
-        "best_params": best_params,
-        "feature_names_out": list(
-            model.regressor_.named_steps["prep"].get_feature_names_out()),
-        "columns": list(X.columns),
-    }
+    print("\n4) Persist artifact + params")
     joblib.dump(artifact, os.path.join(MODELS, "avm_pipeline.joblib"))
-
+    with open(os.path.join(MODELS, "best_params.json"), "w") as f:
+        json.dump(best_params, f, indent=2)
     summary = {
         "test_metrics": test_metrics,
         "pi_coverage_90": coverage,
@@ -230,7 +262,7 @@ def main(n_trials: int = 40):
     }
     with open(os.path.join(REPORTS, "summary.json"), "w") as f:
         json.dump(summary, f, indent=2)
-    print("  saved models/avm_pipeline.joblib and reports/*")
+    print("  saved models/avm_pipeline.joblib, models/best_params.json and reports/*")
     return artifact
 
 

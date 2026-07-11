@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import os
 
-import joblib
+import json
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -15,7 +16,7 @@ import streamlit as st
 from src.data import featurize_raw, suburb_reference, load_raw
 
 HERE = os.path.dirname(__file__)
-MODEL_PATH = os.path.join(HERE, "models", "avm_pipeline.joblib")
+PARAMS_PATH = os.path.join(HERE, "models", "best_params.json")
 
 st.set_page_config(page_title="Melbourne AVM", page_icon="🏠", layout="wide")
 
@@ -35,7 +36,15 @@ st.markdown("""
 
 @st.cache_resource
 def load_artifact():
-    return joblib.load(MODEL_PATH)
+    # Rebuild the model from saved hyperparameters at startup (≈3s, cached) instead
+    # of unpickling — so it always matches the runtime's scikit-learn/LightGBM and
+    # never breaks on a cloud deploy with a different Python/sklearn version.
+    from src.train import build_artifact, DEFAULT_PARAMS
+    params = DEFAULT_PARAMS
+    if os.path.exists(PARAMS_PATH):
+        with open(PARAMS_PATH) as f:
+            params = json.load(f)
+    return build_artifact(params)
 
 
 @st.cache_data
