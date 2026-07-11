@@ -12,7 +12,11 @@ valuation, a calibrated price range, and a per-property explanation** of what dr
 ![SHAP](https://img.shields.io/badge/SHAP-6E56CF?style=flat)
 ![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=flat&logo=streamlit&logoColor=white)
 
-> **Live demo:** `streamlit run app.py` &nbsp;·&nbsp; deploy badge added once published to Streamlit Community Cloud.
+### ▶️ Live demo — **[melbourne-avm.streamlit.app](https://graekoy7vqi7euvdkkucrm.streamlit.app/)**
+
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://graekoy7vqi7euvdkkucrm.streamlit.app/)
+
+Try it live, or run locally with `streamlit run app.py`.
 
 ![Valuation demo](assets/demo_valuation.png)
 
