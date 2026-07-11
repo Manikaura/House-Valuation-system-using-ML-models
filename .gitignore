@@ -1,7 +1,18 @@
-.ipynb_checkpoints/
-**/.ipynb_checkpoints/
-.DS_Store
+# Python
 __pycache__/
 *.pyc
 .venv/
 venv/
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+# Large / regenerable artifacts (retrain with `python -m src.train`)
+*.joblib.bak
+
+# Optuna / logs
+*.log
+optuna_study.db
+catboost_info/

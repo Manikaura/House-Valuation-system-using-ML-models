@@ -1,0 +1,9 @@
+# Runtime dependencies for the Streamlit demo (app.py)
+streamlit>=1.40
+pandas>=2.0
+numpy>=1.26
+scikit-learn>=1.5
+lightgbm>=4.0
+shap>=0.45
+plotly>=5.20
+joblib>=1.3

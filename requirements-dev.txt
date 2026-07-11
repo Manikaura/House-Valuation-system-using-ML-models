@@ -1,0 +1,6 @@
+# Additional dependencies for training / figure generation (src/train.py, src/explain.py)
+-r requirements.txt
+xgboost>=2.0
+catboost>=1.2
+optuna>=3.6
+matplotlib>=3.8
